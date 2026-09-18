@@ -117,7 +117,11 @@ def main():
         "--output_dir", type=str, help="Directory to store the downloaded checkpoints", default="./checkpoints"
     )
     parser.add_argument(
-        "--model", type=str, help="Model type to download", default="all", choices=["all", "7b", "7b_av"]
+        "--model",
+        type=str,
+        help="Model type to download",
+        default="all",
+        choices=["all", "7b", "7b_av", "minimal"],
     )
     args = parser.parse_args()
 
@@ -125,23 +129,35 @@ def main():
         login(token=args.hf_token)
 
     checkpoint_vars = []
-    # Get all variables from the checkpoints module
-    for name in dir(checkpoints):
-        obj = getattr(checkpoints, name)
-        if isinstance(obj, str) and "CHECKPOINT" in name and "PATH" not in name:
-            if args.model != "all" and name in [
-                "COSMOS_TRANSFER1_7B_CHECKPOINT",
-                "COSMOS_TRANSFER1_7B_SAMPLE_AV_CHECKPOINT",
-            ]:
-                if args.model == "7b" and name == "COSMOS_TRANSFER1_7B_CHECKPOINT":
-                    checkpoint_vars.append(obj)
-                elif args.model == "7b_av" and name in [
+
+    if args.model == "minimal":
+        # Only download the required subset
+        checkpoint_vars = [
+            checkpoints.COSMOS_TRANSFER1_7B_CHECKPOINT,                     # base + controlnets
+            checkpoints.COSMOS_TOKENIZER_CHECKPOINT,                        # tokenizer
+            checkpoints.COSMOS_UPSAMPLER_CHECKPOINT,                        # upsampler
+            checkpoints.DEPTH_ANYTHING_MODEL_CHECKPOINT,                    # depth extractor
+            checkpoints.SAM2_MODEL_CHECKPOINT,                              # edge extractor
+        ]
+    else:
+        # Original behavior (unchanged)
+        for name in dir(checkpoints):
+            obj = getattr(checkpoints, name)
+            if isinstance(obj, str) and "CHECKPOINT" in name and "PATH" not in name:
+                if args.model != "all" and name in [
+                    "COSMOS_TRANSFER1_7B_CHECKPOINT",
                     "COSMOS_TRANSFER1_7B_SAMPLE_AV_CHECKPOINT",
-                    "COSMOS_TRANSFER1_7B_MV_SAMPLE_AV_CHECKPOINT",
                 ]:
+                    if args.model == "7b" and name == "COSMOS_TRANSFER1_7B_CHECKPOINT":
+                        checkpoint_vars.append(obj)
+                    elif args.model == "7b_av" and name in [
+                        "COSMOS_TRANSFER1_7B_SAMPLE_AV_CHECKPOINT",
+                        "COSMOS_TRANSFER1_7B_MV_SAMPLE_AV_CHECKPOINT",
+                    ]:
+                        checkpoint_vars.append(obj)
+                else:
                     checkpoint_vars.append(obj)
-            else:
-                checkpoint_vars.append(obj)
+
 
     print(f"Found {len(checkpoint_vars)} checkpoints to download")
 
